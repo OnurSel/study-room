@@ -32,8 +32,8 @@ class JwtServiceTest {
 
         assertEquals(participantId, identity.participantId());
         assertEquals("Alex", identity.displayName());
-        assertTrue(identity.expiresAt().isAfter(beforeIssue.plusSeconds(11 * 60 * 60)));
-        assertTrue(identity.expiresAt().isBefore(Instant.now().plusSeconds(12 * 60 * 60 + 5)));
+        assertTrue(identity.expiresAt().isAfter(beforeIssue.plusSeconds(47 * 60 * 60)));
+        assertTrue(identity.expiresAt().isBefore(Instant.now().plusSeconds(48 * 60 * 60 + 5)));
     }
 
     @Test

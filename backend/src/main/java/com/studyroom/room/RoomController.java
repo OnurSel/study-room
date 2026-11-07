@@ -36,14 +36,14 @@ public class RoomController {
             @AuthenticationPrincipal JwtService.AnonymousIdentity identity) {
         JwtService.AnonymousIdentity user = requireIdentity(identity);
         Room room = roomService.createRoom(user.participantId());
-        return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(room));
+        return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(room, user.participantId()));
     }
 
     @GetMapping("/{code}")
     public RoomResponse getRoom(
             @PathVariable String code,
             @AuthenticationPrincipal JwtService.AnonymousIdentity identity) {
-        requireIdentity(identity);
+        JwtService.AnonymousIdentity user = requireIdentity(identity);
         final Room room;
         try {
             room = roomService.findRoom(code)
@@ -52,7 +52,7 @@ public class RoomController {
         } catch (IllegalArgumentException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid room code", ex);
         }
-        return toResponse(room);
+        return toResponse(room, user.participantId());
     }
 
     private static JwtService.AnonymousIdentity requireIdentity(
@@ -63,10 +63,12 @@ public class RoomController {
         return identity;
     }
 
-    private static RoomResponse toResponse(Room room) {
-        return new RoomResponse(room.code(), room.createdAt(), room.expiresAt());
+    private static RoomResponse toResponse(Room room, java.util.UUID requester) {
+        return new RoomResponse(room.code(), room.createdAt(), room.expiresAt(),
+                room.creatorId().equals(requester));
     }
 
-    public record RoomResponse(String code, Instant createdAt, Instant expiresAt) {
+    /** {@code owner} tells the requesting participant whether they created this room. */
+    public record RoomResponse(String code, Instant createdAt, Instant expiresAt, boolean owner) {
     }
 }

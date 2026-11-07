@@ -1,11 +1,13 @@
 package com.studyroom.timer;
 
+import com.studyroom.room.RoomService;
 import com.studyroom.security.JwtService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,9 +28,11 @@ import java.util.Objects;
 public class TimerController {
 
     private final TimerService timerService;
+    private final RoomService roomService;
 
-    public TimerController(TimerService timerService) {
+    public TimerController(TimerService timerService, RoomService roomService) {
         this.timerService = Objects.requireNonNull(timerService);
+        this.roomService = Objects.requireNonNull(roomService);
     }
 
     @GetMapping
@@ -70,6 +74,31 @@ public class TimerController {
         return snapshot(() -> timerService.switchPhase(code, request.phase()));
     }
 
+    /** Only the participant who created the room may change the shared timer settings. */
+    @PutMapping("/settings")
+    public TimerSnapshot updateSettings(@PathVariable String code,
+                                        @RequestBody(required = false) SettingsRequest request,
+                                        @AuthenticationPrincipal JwtService.AnonymousIdentity identity) {
+        JwtService.AnonymousIdentity user = requireIdentity(identity);
+        if (request == null || request.focusMinutes() == null || request.shortBreakMinutes() == null
+                || request.longBreakMinutes() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "All timer lengths are required");
+        }
+        try {
+            var room = roomService.findRoom(code).orElseThrow(() ->
+                    new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
+            if (!room.creatorId().equals(user.participantId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "Only the room owner can change timer settings");
+            }
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid room code", exception);
+        }
+        return snapshot(() -> timerService.updateSettings(code, request.focusMinutes(),
+                request.shortBreakMinutes(), request.longBreakMinutes(),
+                Boolean.TRUE.equals(request.autoAdvance())));
+    }
+
     private static JwtService.AnonymousIdentity requireIdentity(
             JwtService.AnonymousIdentity identity) {
         if (identity == null) {
@@ -94,6 +123,10 @@ public class TimerController {
     }
 
     public record PhaseRequest(TimerState.Phase phase) {
+    }
+
+    public record SettingsRequest(Integer focusMinutes, Integer shortBreakMinutes,
+                                  Integer longBreakMinutes, Boolean autoAdvance) {
     }
 
     /** Server timestamp allows clients to estimate clock offset. */

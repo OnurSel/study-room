@@ -10,7 +10,7 @@ Free-tier limits change: verify each provider's pricing page before relying on t
 - **Redis**: any Redis (Render Key Value, Upstash...). Use TLS providers with `SPRING_DATA_REDIS_SSL_ENABLED=true`.
 
 ## Environment variables (see `.env.example`)
-`DATABASE_URL` (JDBC form), `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `STUDYROOM_JWT_SECRET` (>= 32 bytes), `STUDYROOM_WEBSOCKET_ALLOWED_ORIGINS` (the public https URL of the service).
+`DATABASE_URL` (JDBC form), `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `STUDYROOM_JWT_SECRET` (>= 32 bytes) (`STUDYROOM_WEBSOCKET_ALLOWED_ORIGINS` is optional: same-origin connections are always allowed).
 
 ## Local smoke test
 ```

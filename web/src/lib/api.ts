@@ -13,6 +13,8 @@ export type StudyRoom = {
   code: string;
   createdAt: string;
   expiresAt: string;
+  /** True when the requesting participant created the room. */
+  owner: boolean;
 };
 
 export type TimerPhase = 'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK';
@@ -27,6 +29,21 @@ export type TimerState = {
   startedAt: string | null;
   endsAt: string | null;
   version: number;
+  focusSeconds: number;
+  shortBreakSeconds: number;
+  longBreakSeconds: number;
+  autoAdvance: boolean;
+  /** Completed focus sessions in this room (a long break follows every 4th). */
+  completedFocus: number;
+  /** Total completed focus time in this room, in seconds. */
+  totalFocusSeconds: number;
+};
+
+export type TimerSettings = {
+  focusMinutes: number;
+  shortBreakMinutes: number;
+  longBreakMinutes: number;
+  autoAdvance: boolean;
 };
 
 export type TimerSnapshot = {
@@ -92,7 +109,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     const messages: Record<number, string> = {
       400: 'Please check the information and try again.',
       401: 'Your session has expired. Please join again.',
-      403: 'You do not have access to this room.',
+      403: 'Only the room owner can do that.',
       404: 'This room or item could not be found.',
       409: 'This item changed. Refresh and try again.',
       429: 'Too many requests. Please try again shortly.',
@@ -124,6 +141,10 @@ export const studyRoomApi = {
     apiRequest<TimerSnapshot>(`${roomPath(code)}/timer/pause`, { method: 'POST', token }),
   resetTimer: (code: string, token: string) =>
     apiRequest<TimerSnapshot>(`${roomPath(code)}/timer/reset`, { method: 'POST', token }),
+  updateTimerSettings: (code: string, settings: TimerSettings, token: string) =>
+    apiRequest<TimerSnapshot>(`${roomPath(code)}/timer/settings`, {
+      method: 'PUT', body: settings, token,
+    }),
   setTimerPhase: (code: string, phase: TimerPhase, token: string) =>
     apiRequest<TimerSnapshot>(`${roomPath(code)}/timer/phase`, {
       method: 'POST', body: { phase }, token,

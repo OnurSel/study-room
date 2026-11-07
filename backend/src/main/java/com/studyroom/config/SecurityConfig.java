@@ -54,7 +54,7 @@ public class SecurityConfig {
                         .authenticated()
                         // Built web client served by this service (static assets + SPA entry points).
                         .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**",
-                                "/favicon.*", "/room/*")
+                                "/favicon.*", "/logo*", "/apple-touch-icon.png", "/room/*")
                         .permitAll()
                         // Everything else is closed by default.
                         .anyRequest().denyAll())

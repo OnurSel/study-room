@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ArrowRight, BookOpen, Check, DoorOpen, Focus, LoaderCircle, LockKeyhole, Plus, Users } from 'lucide-react';
 import RoomDashboard from './components/RoomDashboard';
+import MyRooms from './components/MyRooms';
+import { forgetRoom, readRecentRooms, rememberRoom, type RecentRoom } from './lib/recentRooms';
 
 type Identity = {
   participantId: string;
@@ -9,7 +11,7 @@ type Identity = {
   expiresAt: string;
 };
 
-type Room = { code: string; createdAt: string; expiresAt: string };
+type Room = { code: string; createdAt: string; expiresAt: string; owner: boolean };
 type Mode = 'create' | 'join';
 
 const API = '/api/v1';
@@ -17,7 +19,7 @@ const IDENTITY_KEY = 'studyroom.identity.v1';
 
 function readIdentity(): Identity | null {
   try {
-    const raw = sessionStorage.getItem(IDENTITY_KEY);
+    const raw = localStorage.getItem(IDENTITY_KEY);
     if (!raw) return null;
     const parsed: Identity = JSON.parse(raw);
     return parsed.token && Date.parse(parsed.expiresAt) > Date.now() ? parsed : null;
@@ -63,6 +65,7 @@ export default function App() {
   const [room, setRoom] = useState<Room | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [recent, setRecent] = useState<RecentRoom[]>(() => readRecentRooms());
 
   useEffect(() => {
     const onPopState = () => {
@@ -76,46 +79,73 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  async function identify(): Promise<Identity> {
+  async function identify(displayName: string = name.trim()): Promise<Identity> {
     if (identity?.token && Date.parse(identity.expiresAt) > Date.now()) {
-      if (identity.displayName === name.trim()) return identity;
+      if (identity.displayName === displayName) return identity;
     }
     const fresh = await apiRequest<Identity>('/auth/anonymous', {
       method: 'POST',
-      body: JSON.stringify({ displayName: name.trim() }),
+      body: JSON.stringify({ displayName }),
     });
-    sessionStorage.setItem(IDENTITY_KEY, JSON.stringify(fresh));
+    try { localStorage.setItem(IDENTITY_KEY, JSON.stringify(fresh)); } catch { /* storage unavailable */ }
     setIdentity(fresh);
     return fresh;
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    void enterRoom(mode, code);
+  }
+
+  /** Reopens a room remembered on this device; the name comes from the saved identity. */
+  function openRecent(roomCode: string) {
+    const saved = name.trim() || identity?.displayName || '';
+    setMode('join');
+    setCode(roomCode);
+    if (!saved) {
+      setError('Enter your name first, then press Join study room.');
+      return;
+    }
+    setName(saved);
+    void enterRoom('join', roomCode, saved);
+  }
+
+  function dropRecent(roomCode: string) {
+    forgetRoom(roomCode);
+    setRecent(readRecentRooms());
+  }
+
+  async function enterRoom(entryMode: Mode, entryCode: string, nameOverride?: string) {
     setError('');
-    const displayName = name.trim();
-    const inviteCode = code.trim().toUpperCase();
+    const displayName = (nameOverride ?? name).trim();
+    const inviteCode = entryCode.trim().toUpperCase();
     if (!displayName || displayName.length > 40) {
       setError('Please enter a name between 1 and 40 characters.');
       return;
     }
-    if (mode === 'join' && !/^[A-Z0-9_-]{4,16}$/.test(inviteCode)) {
+    if (entryMode === 'join' && !/^[A-Z0-9_-]{4,16}$/.test(inviteCode)) {
       setError('Enter a valid room code.');
       return;
     }
 
     setBusy(true);
     try {
-      const user = await identify();
-      const result = mode === 'create'
+      const user = await identify(displayName);
+      const result = entryMode === 'create'
         ? await apiRequest<Room>('/rooms', { method: 'POST' }, user.token)
         : await apiRequest<Room>(`/rooms/${encodeURIComponent(inviteCode)}`, {}, user.token);
+      rememberRoom({ code: result.code, expiresAt: result.expiresAt, owner: result.owner });
+      setRecent(readRecentRooms());
       setRoom(result);
       setCode(result.code);
       window.history.pushState({}, '', `/room/${encodeURIComponent(result.code)}`);
     } catch (caught) {
       if (caught instanceof Error && caught.message.includes('session expired')) {
-        sessionStorage.removeItem(IDENTITY_KEY);
+        try { localStorage.removeItem(IDENTITY_KEY); } catch { /* storage unavailable */ }
         setIdentity(null);
+      }
+      if (entryMode === 'join' && caught instanceof Error && caught.message.includes('could not be found')) {
+        dropRecent(inviteCode);
       }
       setError(caught instanceof Error ? caught.message : 'Unexpected error. Please try again.');
     } finally {
@@ -136,7 +166,7 @@ export default function App() {
     <div className="app-shell">
       <header className="site-header">
         <a className="brand" href="/" onClick={(event) => { event.preventDefault(); leaveRoom(); }} aria-label="Study Room home">
-          <span className="brand-mark"><BookOpen size={20} strokeWidth={2.1} /></span>
+          <span className="brand-mark"><img src="/logo.svg" alt="" width="34" height="34" style={{ display: 'block', borderRadius: 9 }} /></span>
           <span>studyroom<span className="brand-dot">.</span></span>
         </a>
         <span className="header-note"><span className="status-light" /> A little more focus, together.</span>
@@ -149,6 +179,7 @@ export default function App() {
             roomCode={room.code}
             token={identity.token}
             participantId={identity.participantId}
+            isOwner={room.owner}
             displayName={identity.displayName}
             onLeave={leaveRoom}
           />
@@ -173,6 +204,7 @@ export default function App() {
                 <button className="button button-dark submit-button" type="submit" disabled={busy}>{busy ? <><LoaderCircle className="spin" size={18} /> Connecting…</> : <>{mode === 'create' ? 'Create my study room' : 'Join study room'} <ArrowRight size={18} /></>}</button>
               </form>
               <p className="entry-bottom"><LockKeyhole size={13} /> Free to use · No sign-up required</p>
+              <MyRooms rooms={recent} busy={busy} onOpen={openRecent} onForget={dropRecent} />
             </section>
           </div>
         )}

@@ -28,7 +28,7 @@ public class JwtService {
 
     private static final String ISSUER = "studyroom";
     private static final String DISPLAY_NAME_CLAIM = "displayName";
-    private static final Duration TOKEN_LIFETIME = Duration.ofHours(12);
+    private static final Duration TOKEN_LIFETIME = Duration.ofHours(48);
 
     private final String configuredSecret;
 

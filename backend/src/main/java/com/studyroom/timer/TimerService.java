@@ -88,6 +88,13 @@ public class TimerService {
         return mutate(roomCode, state -> state.switchTo(phase));
     }
 
+    /** Updates the room's timer lengths and auto-advance flag; callers must authorize the owner. */
+    public TimerState updateSettings(String roomCode, int focusMinutes, int shortBreakMinutes,
+                                     int longBreakMinutes, boolean autoAdvance) {
+        return mutate(roomCode, state -> state.withSettings(
+                focusMinutes, shortBreakMinutes, longBreakMinutes, autoAdvance));
+    }
+
     private TimerState mutate(String roomCode, UnaryOperator<TimerState> change) {
         String code = normalize(roomCode);
         // Also ensures that an expired/nonexistent room cannot acquire a new timer.
