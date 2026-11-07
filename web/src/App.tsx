@@ -11,7 +11,7 @@ type Identity = {
   expiresAt: string;
 };
 
-type Room = { code: string; createdAt: string; expiresAt: string; owner: boolean };
+type Room = { code: string; createdAt: string; expiresAt: string; owner: boolean; name?: string | null };
 type Mode = 'create' | 'join';
 
 const API = '/api/v1';
@@ -61,6 +61,7 @@ export default function App() {
   const [mode, setMode] = useState<Mode>(getInitialCode() ? 'join' : 'create');
   const [name, setName] = useState(() => readIdentity()?.displayName ?? '');
   const [code, setCode] = useState(getInitialCode);
+  const [roomName, setRoomName] = useState('');
   const [identity, setIdentity] = useState<Identity | null>(readIdentity);
   const [room, setRoom] = useState<Room | null>(null);
   const [busy, setBusy] = useState(false);
@@ -132,9 +133,9 @@ export default function App() {
     try {
       const user = await identify(displayName);
       const result = entryMode === 'create'
-        ? await apiRequest<Room>('/rooms', { method: 'POST' }, user.token)
+        ? await apiRequest<Room>('/rooms', { method: 'POST', ...(roomName.trim() ? { body: JSON.stringify({ name: roomName.trim() }) } : {}) }, user.token)
         : await apiRequest<Room>(`/rooms/${encodeURIComponent(inviteCode)}`, {}, user.token);
-      rememberRoom({ code: result.code, expiresAt: result.expiresAt, owner: result.owner });
+      rememberRoom({ code: result.code, expiresAt: result.expiresAt, owner: result.owner, name: result.name });
       setRecent(readRecentRooms());
       setRoom(result);
       setCode(result.code);
@@ -177,6 +178,7 @@ export default function App() {
         {room && identity ? (
           <RoomDashboard
             roomCode={room.code}
+            roomName={room.name ?? undefined}
             token={identity.token}
             participantId={identity.participantId}
             isOwner={room.owner}
@@ -199,6 +201,7 @@ export default function App() {
               <form onSubmit={handleSubmit} noValidate>
                 <label className="field-label" htmlFor="display-name">WHAT SHOULD WE CALL YOU?</label>
                 <input id="display-name" className="form-input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Your name" maxLength={40} autoComplete="nickname" required />
+                {mode === 'create' && <><label className="field-label" htmlFor="room-name">ROOM NAME (OPTIONAL)</label><input id="room-name" className="form-input" value={roomName} onChange={(event) => setRoomName(event.target.value)} placeholder="e.g. Finals prep" maxLength={40} autoComplete="off" /></>}
                 {mode === 'join' && <><label className="field-label" htmlFor="room-code">ROOM CODE</label><input id="room-code" className="form-input code-input" value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="e.g. A7BC92" maxLength={16} autoComplete="off" spellCheck={false} required /></>}
                 {error && <p className="form-error" role="alert">{error}</p>}
                 <button className="button button-dark submit-button" type="submit" disabled={busy}>{busy ? <><LoaderCircle className="spin" size={18} /> Connecting…</> : <>{mode === 'create' ? 'Create my study room' : 'Join study room'} <ArrowRight size={18} /></>}</button>

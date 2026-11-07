@@ -15,6 +15,7 @@ import { connectRoomLive, type ConnectionState } from '../lib/websocket';
 
 type Props = {
   roomCode: string;
+  roomName?: string;
   token: string;
   participantId: string;
   displayName: string;
@@ -61,7 +62,7 @@ function asMessage(error: unknown): string {
 const PHASE_LABEL: Record<TimerPhase, string> = { FOCUS: 'Focus', SHORT_BREAK: 'Short break', LONG_BREAK: 'Long break' };
 const SESSIONS_PER_CYCLE = 4;
 
-export default function RoomDashboard({ roomCode, token, participantId, displayName, isOwner, onLeave }: Props) {
+export default function RoomDashboard({ roomCode, roomName, token, participantId, displayName, isOwner, onLeave }: Props) {
   const [timer, setTimer] = useState<TimerSnapshot | null>(null);
   const [tasks, setTasks] = useState<StudyTask[]>([]);
   const [presence, setPresence] = useState<PresenceSnapshot | null>(null);
@@ -255,7 +256,7 @@ export default function RoomDashboard({ roomCode, token, participantId, displayN
         <button type="button" className="text-button" onClick={onLeave}><X size={16} /> Leave room</button>
       </div>
       <div className="room-heading">
-        <div><h1 id="room-title">Let's make progress<span className="accent-period">.</span></h1><p>One room, one shared focus. Welcome, {displayName}.</p></div>
+        <div><h1 id="room-title">{roomName ?? <>Let's make progress<span className="accent-period">.</span></>}</h1><p>One room, one shared focus. Welcome, {displayName}.</p></div>
         <span className="room-live">{connection === 'connected' ? <Wifi size={15} /> : <WifiOff size={15} />}{connection === 'connected' ? 'Live & synced' : 'Reconnecting'}</span>
       </div>
       {error && <p className="form-error" role="alert" style={{ marginBottom: 18 }}>{error} <button type="button" className="text-button" onClick={() => void refresh()}>Retry</button></p>}

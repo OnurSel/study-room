@@ -11,6 +11,8 @@ export type RecentRoom = {
   /** ISO time the room expires on the server. */
   expiresAt: string;
   owner: boolean;
+  /** Optional friendly name given by the creator. */
+  name?: string;
 };
 
 export function readRecentRooms(now: number = Date.now()): RecentRoom[] {
@@ -37,7 +39,7 @@ function write(rooms: RecentRoom[]): void {
   }
 }
 
-export function rememberRoom(room: { code: string; expiresAt: string; owner: boolean }): void {
+export function rememberRoom(room: { code: string; expiresAt: string; owner: boolean; name?: string | null }): void {
   const existing = readRecentRooms();
   const previous = existing.find((entry) => entry.code === room.code);
   const others = existing.filter((entry) => entry.code !== room.code);
@@ -47,6 +49,7 @@ export function rememberRoom(room: { code: string; expiresAt: string; owner: boo
       code: room.code,
       expiresAt: room.expiresAt,
       owner: room.owner || !!previous?.owner,
+      name: room.name || previous?.name || undefined,
       lastVisited: new Date().toISOString(),
     },
     ...others,

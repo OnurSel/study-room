@@ -15,8 +15,14 @@ public record Room(
         String code,
         UUID creatorId,
         Instant createdAt,
-        Instant expiresAt
+        Instant expiresAt,
+        String name
 ) {
+
+    /** Rooms created before names existed (or without one) have no name. */
+    public Room(String code, UUID creatorId, Instant createdAt, Instant expiresAt) {
+        this(code, creatorId, createdAt, expiresAt, null);
+    }
 
     public Room {
         Objects.requireNonNull(code, "code must not be null");

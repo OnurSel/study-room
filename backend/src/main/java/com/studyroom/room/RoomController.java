@@ -7,6 +7,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -33,9 +34,10 @@ public class RoomController {
 
     @PostMapping
     public ResponseEntity<RoomResponse> createRoom(
-            @AuthenticationPrincipal JwtService.AnonymousIdentity identity) {
+            @AuthenticationPrincipal JwtService.AnonymousIdentity identity,
+            @RequestBody(required = false) CreateRoomRequest request) {
         JwtService.AnonymousIdentity user = requireIdentity(identity);
-        Room room = roomService.createRoom(user.participantId());
+        Room room = roomService.createRoom(user.participantId(), request == null ? null : request.name());
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(room, user.participantId()));
     }
 
@@ -65,10 +67,14 @@ public class RoomController {
 
     private static RoomResponse toResponse(Room room, java.util.UUID requester) {
         return new RoomResponse(room.code(), room.createdAt(), room.expiresAt(),
-                room.creatorId().equals(requester));
+                room.creatorId().equals(requester), room.name());
     }
 
     /** {@code owner} tells the requesting participant whether they created this room. */
-    public record RoomResponse(String code, Instant createdAt, Instant expiresAt, boolean owner) {
+    public record RoomResponse(String code, Instant createdAt, Instant expiresAt, boolean owner, String name) {
+    }
+
+    /** Optional body for room creation. */
+    public record CreateRoomRequest(String name) {
     }
 }

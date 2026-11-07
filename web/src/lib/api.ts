@@ -15,6 +15,8 @@ export type StudyRoom = {
   expiresAt: string;
   /** True when the requesting participant created the room. */
   owner: boolean;
+  /** Optional friendly name chosen by the creator. */
+  name?: string | null;
 };
 
 export type TimerPhase = 'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK';
@@ -128,8 +130,8 @@ export const studyRoomApi = {
   createIdentity: (displayName: string) =>
     apiRequest<AnonymousIdentity>('/auth/anonymous', { method: 'POST', body: { displayName } }),
 
-  createRoom: (token: string) =>
-    apiRequest<StudyRoom>('/rooms', { method: 'POST', token }),
+  createRoom: (token: string, name?: string) =>
+    apiRequest<StudyRoom>('/rooms', { method: 'POST', token, ...(name ? { body: { name } } : {}) }),
   getRoom: (code: string, token: string) =>
     apiRequest<StudyRoom>(roomPath(code), { token }),
 

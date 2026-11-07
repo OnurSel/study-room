@@ -33,6 +33,7 @@ public class RoomService {
     private static final String CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final int CODE_LENGTH = 8;
     private static final int MAX_CREATE_ATTEMPTS = 12;
+    static final int MAX_NAME_LENGTH = 40;
     private static final Duration ROOM_LIFETIME = Duration.ofHours(24);
 
     private final RedisTemplate<String, String> redis;
@@ -54,12 +55,18 @@ public class RoomService {
 
     /** Creates a room owned by an authenticated anonymous participant. */
     public Room createRoom(UUID creatorId) {
+        return createRoom(creatorId, null);
+    }
+
+    /** Creates a room with an optional human-friendly name (trimmed, max 40 chars). */
+    public Room createRoom(UUID creatorId, String name) {
         Objects.requireNonNull(creatorId, "creatorId");
+        String cleanName = cleanName(name);
         Instant createdAt = clock.instant();
         Instant expiresAt = createdAt.plus(ROOM_LIFETIME);
 
         for (int attempt = 0; attempt < MAX_CREATE_ATTEMPTS; attempt++) {
-            Room room = new Room(newCode(), creatorId, createdAt, expiresAt);
+            Room room = new Room(newCode(), creatorId, createdAt, expiresAt, cleanName);
             Boolean created = redis.opsForValue().setIfAbsent(
                     redisKey(room.code()), serialize(room), ROOM_LIFETIME);
             if (Boolean.TRUE.equals(created)) {
@@ -95,6 +102,17 @@ public class RoomService {
     /** Removes room metadata. Associated task/presence cleanup belongs to their services. */
     public boolean deleteRoom(String code) {
         return Boolean.TRUE.equals(redis.delete(redisKey(normalizeCode(code))));
+    }
+
+    static String cleanName(String name) {
+        if (name == null) {
+            return null;
+        }
+        String cleaned = name.replaceAll("\\p{Cntrl}", " ").trim().replaceAll("\\s+", " ");
+        if (cleaned.isEmpty()) {
+            return null;
+        }
+        return cleaned.length() > MAX_NAME_LENGTH ? cleaned.substring(0, MAX_NAME_LENGTH).trim() : cleaned;
     }
 
     private String newCode() {

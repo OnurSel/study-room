@@ -38,7 +38,7 @@ export default function MyRooms({ rooms, busy, onOpen, onForget }: Props) {
             <li key={room.code} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderTop: '1px solid #eef0ea' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}>
-                  <strong style={{ letterSpacing: 1 }}>{room.code}</strong>
+                  <strong style={room.name ? undefined : { letterSpacing: 1 }}>{room.name ?? room.code}</strong>
                   {room.owner && (
                     <span title="You created this room" aria-label="You created this room" style={{ color: '#8a6d2f', display: 'inline-flex' }}>
                       <Crown size={14} />
@@ -46,7 +46,7 @@ export default function MyRooms({ rooms, busy, onOpen, onForget }: Props) {
                   )}
                 </span>
                 <small style={{ display: 'block', color: '#8b978d' }}>
-                  visited {relative(room.lastVisited)} · {remaining(room.expiresAt)}
+                  {room.name ? `${room.code} · ` : ''}visited {relative(room.lastVisited)} · {remaining(room.expiresAt)}
                 </small>
               </div>
               <button type="button" className="button button-dark" disabled={busy} onClick={() => onOpen(room.code)}>
@@ -66,7 +66,7 @@ export default function MyRooms({ rooms, busy, onOpen, onForget }: Props) {
             {past.map((room) => (
               <li key={room.code} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: '1px solid #eef0ea', color: '#8b978d' }}>
                 <span style={{ flex: 1, letterSpacing: 1 }}>
-                  {room.code}{room.owner ? ' · yours' : ''} <small>· {relative(room.lastVisited)}</small>
+                  {room.name ? `${room.name} · ${room.code}` : room.code}{room.owner ? ' · yours' : ''} <small>· {relative(room.lastVisited)}</small>
                 </span>
                 <button type="button" className="text-button" aria-label={`Remove room ${room.code} from this list`} onClick={() => onForget(room.code)}>
                   <X size={15} />
