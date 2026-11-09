@@ -45,6 +45,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**")
                         .permitAll()
+                        // Uptime monitors probe with HEAD; treat it like GET on public paths.
+                        .requestMatchers(HttpMethod.HEAD, "/actuator/health", "/actuator/health/**")
+                        .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/anonymous")
                         .permitAll()
                         .requestMatchers("/ws", "/ws/**")
@@ -54,6 +57,9 @@ public class SecurityConfig {
                         .authenticated()
                         // Built web client served by this service (static assets + SPA entry points).
                         .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**",
+                                "/favicon.*", "/logo*", "/apple-touch-icon.png", "/room/*")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.HEAD, "/", "/index.html", "/assets/**",
                                 "/favicon.*", "/logo*", "/apple-touch-icon.png", "/room/*")
                         .permitAll()
                         // Everything else is closed by default.
