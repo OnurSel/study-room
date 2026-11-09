@@ -17,35 +17,58 @@ const PRESETS: { label: string; focus: number; shortBreak: number; longBreak: nu
   { label: '90 / 20', focus: 90, shortBreak: 20, longBreak: 30 },
 ];
 
-function clampInput(raw: string, max: number): number {
-  const value = Math.round(Number(raw));
-  if (!Number.isFinite(value)) return 1;
-  return Math.min(max, Math.max(1, value));
+/** Keeps what the user is typing (digits only, may be empty while editing). */
+function digitsOnly(raw: string): string {
+  return raw.replace(/\D/g, '').slice(0, 3);
+}
+
+/** Minutes for a field's text, or null while it is empty or out of range. */
+function parseMinutes(text: string, max: number): number | null {
+  if (text === '') return null;
+  const value = Number(text);
+  return value >= 1 && value <= max ? value : null;
+}
+
+/** Applied when the field loses focus: empty falls back, the rest is pulled into range. */
+function settle(text: string, max: number, fallback: number): string {
+  if (text === '') return String(fallback);
+  return String(Math.min(max, Math.max(1, Number(text))));
 }
 
 /** Room owner edits the shared lengths; everyone else sees them read-only. */
 export default function TimerSettingsPanel({ timer, isOwner, busy, onSave }: Props) {
-  const [focus, setFocus] = useState(25);
-  const [shortBreak, setShortBreak] = useState(5);
-  const [longBreak, setLongBreak] = useState(15);
+  // Text state so a field can be cleared and retyped without snapping back to 1.
+  const [focusText, setFocusText] = useState('25');
+  const [shortBreakText, setShortBreakText] = useState('5');
+  const [longBreakText, setLongBreakText] = useState('15');
   const [auto, setAuto] = useState(false);
+
+  const serverFocus = timer ? Math.round(timer.focusSeconds / 60) : 25;
+  const serverShortBreak = timer ? Math.round(timer.shortBreakSeconds / 60) : 5;
+  const serverLongBreak = timer ? Math.round(timer.longBreakSeconds / 60) : 15;
 
   // Follow the server's values whenever they change (e.g. another tab saved them).
   useEffect(() => {
     if (!timer) return;
-    setFocus(Math.round(timer.focusSeconds / 60));
-    setShortBreak(Math.round(timer.shortBreakSeconds / 60));
-    setLongBreak(Math.round(timer.longBreakSeconds / 60));
+    setFocusText(String(serverFocus));
+    setShortBreakText(String(serverShortBreak));
+    setLongBreakText(String(serverLongBreak));
     setAuto(timer.autoAdvance);
   }, [timer?.focusSeconds, timer?.shortBreakSeconds, timer?.longBreakSeconds, timer?.autoAdvance]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const dirty = !!timer && (
+  const focus = parseMinutes(focusText, LIMITS.focus);
+  const shortBreak = parseMinutes(shortBreakText, LIMITS.shortBreak);
+  const longBreak = parseMinutes(longBreakText, LIMITS.longBreak);
+  const valid = focus !== null && shortBreak !== null && longBreak !== null;
+
+  const dirty = !!timer && valid && (
     focus * 60 !== timer.focusSeconds || shortBreak * 60 !== timer.shortBreakSeconds
     || longBreak * 60 !== timer.longBreakSeconds || auto !== timer.autoAdvance
   );
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (focus === null || shortBreak === null || longBreak === null) return;
     onSave({ focusMinutes: focus, shortBreakMinutes: shortBreak, longBreakMinutes: longBreak, autoAdvance: auto });
   }
 
@@ -56,7 +79,7 @@ export default function TimerSettingsPanel({ timer, isOwner, busy, onSave }: Pro
       <article className="panel">
         <div className="panel-kicker"><Settings2 size={16} /> TIMER SETTINGS</div>
         <p style={{ margin: '14px 0 4px', fontSize: 14 }}>
-          Focus <strong>{focus} min</strong> · Short break <strong>{shortBreak} min</strong> · Long break <strong>{longBreak} min</strong>
+          Focus <strong>{serverFocus} min</strong> · Short break <strong>{serverShortBreak} min</strong> · Long break <strong>{serverLongBreak} min</strong>
         </p>
         <p className="preview-note">
           {auto ? 'Phases follow each other automatically. ' : ''}Only the person who created this room can change these.
@@ -81,7 +104,11 @@ export default function TimerSettingsPanel({ timer, isOwner, busy, onSave }: Pro
             type="button"
             className="text-button"
             style={{ padding: '7px 12px', borderRadius: 30, background: '#f7f8f5' }}
-            onClick={() => { setFocus(preset.focus); setShortBreak(preset.shortBreak); setLongBreak(preset.longBreak); }}
+            onClick={() => {
+              setFocusText(String(preset.focus));
+              setShortBreakText(String(preset.shortBreak));
+              setLongBreakText(String(preset.longBreak));
+            }}
           >
             {preset.label}
           </button>
@@ -90,16 +117,22 @@ export default function TimerSettingsPanel({ timer, isOwner, busy, onSave }: Pro
       <form onSubmit={submit} style={{ marginTop: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
           <label style={{ fontSize: 12 }}>Focus (min)
-            <input className="form-input" style={numberStyle} type="number" inputMode="numeric" min={1} max={LIMITS.focus} value={focus}
-              onChange={(event) => setFocus(clampInput(event.target.value, LIMITS.focus))} />
+            <input className="form-input" style={numberStyle} type="text" inputMode="numeric" pattern="[0-9]*" maxLength={3}
+              title={`1–${LIMITS.focus} minutes`} value={focusText}
+              onChange={(event) => setFocusText(digitsOnly(event.target.value))}
+              onBlur={() => setFocusText(settle(focusText, LIMITS.focus, serverFocus))} />
           </label>
           <label style={{ fontSize: 12 }}>Short break
-            <input className="form-input" style={numberStyle} type="number" inputMode="numeric" min={1} max={LIMITS.shortBreak} value={shortBreak}
-              onChange={(event) => setShortBreak(clampInput(event.target.value, LIMITS.shortBreak))} />
+            <input className="form-input" style={numberStyle} type="text" inputMode="numeric" pattern="[0-9]*" maxLength={3}
+              title={`1–${LIMITS.shortBreak} minutes`} value={shortBreakText}
+              onChange={(event) => setShortBreakText(digitsOnly(event.target.value))}
+              onBlur={() => setShortBreakText(settle(shortBreakText, LIMITS.shortBreak, serverShortBreak))} />
           </label>
           <label style={{ fontSize: 12 }}>Long break
-            <input className="form-input" style={numberStyle} type="number" inputMode="numeric" min={1} max={LIMITS.longBreak} value={longBreak}
-              onChange={(event) => setLongBreak(clampInput(event.target.value, LIMITS.longBreak))} />
+            <input className="form-input" style={numberStyle} type="text" inputMode="numeric" pattern="[0-9]*" maxLength={3}
+              title={`1–${LIMITS.longBreak} minutes`} value={longBreakText}
+              onChange={(event) => setLongBreakText(digitsOnly(event.target.value))}
+              onBlur={() => setLongBreakText(settle(longBreakText, LIMITS.longBreak, serverLongBreak))} />
           </label>
         </div>
         <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 14, fontSize: 13 }}>
