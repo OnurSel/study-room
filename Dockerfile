@@ -21,6 +21,6 @@ RUN addgroup -S app && adduser -S app -G app
 WORKDIR /app
 COPY --from=backend /app/app.jar ./app.jar
 USER app
-ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75"
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -Xss512k -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -XX:TieredStopAtLevel=1"
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

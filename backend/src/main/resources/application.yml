@@ -1,6 +1,8 @@
 spring:
   application:
     name: studyroom-backend
+  main:
+    lazy-initialization: ${LAZY_INIT:true}
 
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/studyroom}
